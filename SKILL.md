@@ -18,9 +18,7 @@ something just *smells* off. Two halves:
 
 > **Portable by design.** The deterministic half is tool-agnostic — wire in your
 > stack's linter / typechecker / scanner. The pattern hunt needs no tooling at
-> all; it's a structured way of looking. Want the dimensions bundled into one
-> command, and the by-design verdicts recorded so they compound across runs? See
-> [INTEGRATIONS.md](INTEGRATIONS.md).
+> all; it's a structured way of looking.
 
 ---
 
@@ -202,3 +200,9 @@ adds the bug that just bit them.
 Because it's the work you know you should do and skip anyway. This makes it a
 single command, gives the boring-but-load-bearing checks a place to live, and —
 once a verdict is recorded — means you never chew the same stalk twice. 🥦
+
+---
+
+*Want the deterministic checks bundled into one command, and by-design verdicts
+recorded for you so they compound across a team? See
+[INTEGRATIONS.md](INTEGRATIONS.md).*
