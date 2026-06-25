@@ -1,7 +1,7 @@
 ---
 name: eat-the-broccoli
-description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo/stack (portable core); deeper if you run Empirica (records the by-design verdicts so they compound). Levels: quick / standard / deep. Scope: changed / module / repo."
-version: 2.0.0
+description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo or stack. Levels: quick / standard / deep. Scope: changed / module / repo."
+version: 2.1.0
 ---
 
 # Eat the Broccoli 🥦
@@ -16,12 +16,11 @@ something just *smells* off. Two halves:
    null-masking, deploy-staleness. Tools can't catch these; only a trained eye
    plus a *"is this by design?"* check can.
 
-> **Portable by design.** The core works in any language or stack — wire in your
-> own linter / typechecker / scanner. If you run
-> [Empirica](https://github.com/EmpiricaAI/empirica), the `[empirica]`-marked
-> lines wire it all up *and* record which findings are "by design" so the next
-> sweep doesn't re-litigate them. Without Empirica, it's a checklist you run and
-> track yourself.
+> **Portable by design.** The deterministic half is tool-agnostic — wire in your
+> stack's linter / typechecker / scanner. The pattern hunt needs no tooling at
+> all; it's a structured way of looking. Want the dimensions bundled into one
+> command, and the by-design verdicts recorded so they compound across runs? See
+> [INTEGRATIONS.md](INTEGRATIONS.md).
 
 ---
 
@@ -46,17 +45,17 @@ skipped** — silent truncation reads as "covered everything."
 ## Phase 1 — Deterministic tooling
 
 Run your stack's equivalent of each. Skip what you don't have; the sweep still
-works. (`[empirica]` = the bundled one-command version.)
+works.
 
-| Dimension | Generic tool | `[empirica]` |
-|---|---|---|
-| Lint / style | ruff, eslint, golangci-lint, clippy | `empirica compliance-report` |
-| Types | pyright, tsc, mypy | ↑ bundled |
-| Tests | pytest, jest, go test | ↑ bundled |
-| Dependency CVEs | pip-audit, npm audit, cargo-audit | `empirica security-audit` (+ CISA KEV priority) |
-| Dead code | vulture, ts-prune, deadcode | (also in the pattern hunt) |
-| Silent failures | grep bare `except:` / empty `catch {}` | ruff `S110,BLE001` |
-| Contract guards | your CLI / API contract tests | `pytest tests/integrity/` |
+| Dimension | Tools |
+|---|---|
+| Lint / style | ruff, eslint, golangci-lint, clippy |
+| Types | pyright, tsc, mypy, `cargo check` |
+| Tests | pytest, jest, go test, cargo test |
+| Dependency CVEs | pip-audit, npm audit, cargo-audit |
+| Dead code | vulture, ts-prune, cargo-machete |
+| Silent failures | bare `except:` / empty `catch {}` / discarded `Result` |
+| Contract guards | your CLI / API contract tests |
 
 ### Tooling by language
 
@@ -86,16 +85,13 @@ The dimensions map to concrete tools. Two reference stacks:
 | Silent failures | clippy | `-W clippy::unwrap_used -W clippy::let_underscore_must_use` + hunt discarded Results: `let _ = fallible()`, `.ok()`, `.unwrap_or_default()` |
 | Unsafe audit | cargo-geiger | `cargo install cargo-geiger` → `cargo geiger` |
 
-> **Easy button:** `pip install empirica` ships the Python stack + the
-> compliance/security crosswalk pre-wired, so `empirica compliance-report` and
-> `empirica security-audit` Just Work. The Rust column is the reference for
-> Codex/Rust projects to wire the same dimensions natively. The **pattern hunt
-> below is language-agnostic** — it ports verbatim.
+> The **pattern hunt below is language-agnostic** — it ports verbatim across any
+> stack.
 
 **Reading silent failures:** a truly-silent swallow (`except: pass`, empty
-`catch {}`) is the dangerous one. A broad catch that *logs or re-raises* is
-often deliberate degradation — flag the **new** ones, and any with no log and no
-re-raise, not the absolute count.
+`catch {}`, `let _ = fallible()`) is the dangerous one. A broad catch that *logs
+or re-raises* is often deliberate degradation — flag the **new** ones, and any
+with no log and no re-raise, not the absolute count.
 
 ---
 
@@ -107,9 +103,14 @@ identical** — so each row carries the disambiguator that tells them apart.
 
 **The one meta-question:** *"This looks intentional — is it actually?"* When you
 find a smell, check the intent (a comment, a test, a doc, or ask). When it
-resolves to "yes, by design," **record that verdict** so you don't re-litigate
-it next sweep — `[empirica]` `decision-log`; otherwise an inline annotation or a
-`.broccoli-accept` allow-list.
+resolves to "yes, by design," **record that verdict** (an inline annotation or a
+`.broccoli-accept` line — see below) so you don't re-litigate it next sweep.
+
+*Worked example.* You spot a function returning `[]` on a DB timeout
+(**fallback-masks-primary**). Check the intent: does it log or raise? It logs
+nothing → **❌ broken** — callers can't tell "no rows" from "DB down." If instead
+it logged a warning and returned `[]` as a *documented* degraded mode →
+**✅ by design**: record it with the reason, move on.
 
 ### A. State & timing
 | Smell | ✅ by design if | ❌ broken if |
@@ -154,17 +155,45 @@ it next sweep — `[empirica]` `decision-log`; otherwise an inline annotation or
 | **Dead branch by construction** — a path an earlier check already decided | intentional belt-and-suspenders | genuinely unreachable (shadowed by a prior return) |
 
 > **This table is living.** When a new class of issue bites you, add a row with
-> its disambiguator. That's the compounding mechanism — every incident becomes a
-> permanent future check.
+> its disambiguator — every incident becomes a permanent future check. Found one
+> we're missing? **PR it** (see Contributing).
 
 ---
 
 ## Phase 3 — Triage, verdict, record
 
-1. **Real issue** → log it (`[empirica]` `finding-log` + `goals-create`; otherwise an issue / TODO).
-2. **Confirmed by-design** → **record the verdict** (`[empirica]` `decision-log`; otherwise an inline annotation / `.broccoli-accept`) so the next sweep skips it.
+1. **Real issue** → log it (an issue, a TODO, your tracker).
+2. **Confirmed by-design** → **record the verdict** (an inline annotation or a `.broccoli-accept` line) so the next sweep skips it.
 3. **Roll up a verdict:** 🟢 **GREEN** (ship) · 🟡 **YELLOW** (ship + logged follow-ups) · 🔴 **RED** (blockers — name them).
 4. Re-runs are idempotent: track counts over time. A *rising* silent-failure / debt count is the signal, not the absolute number.
+
+### The `.broccoli-accept` file
+
+One confirmed by-design finding per line — a `.gitignore` for false alarms, so
+the next sweep stays quiet on what you've already judged:
+
+```
+# pattern:location — why it's intentional (and what would reverse it)
+fallback-masks-primary:db/cache.py:fetch — logged degraded mode; reverse if callers start trusting []
+blind-except:sync/git_notes.py — non-fatal best-effort write; errors visible upstream
+```
+
+Keep the *why*. A verdict without a reason is just a mute button — and the next
+person (or the next you) can't tell a real judgment from a silenced alarm.
+
+---
+
+## Contributing
+
+The pattern hunt is meant to **grow across languages and harnesses** — that's the
+whole point. Hit a failure class that isn't here? Open a PR with a row:
+
+```
+| **Name** — the smell | ✅ by design if … | ❌ broken if … |
+```
+
+Real war stories make the best rows. The catalog gets sharper every time someone
+adds the bug that just bit them.
 
 ---
 
@@ -172,5 +201,4 @@ it next sweep — `[empirica]` `decision-log`; otherwise an inline annotation or
 
 Because it's the work you know you should do and skip anyway. This makes it a
 single command, gives the boring-but-load-bearing checks a place to live, and —
-if you run Empirica — remembers which broccoli you already ate so you never chew
-the same stalk twice. 🥦
+once a verdict is recorded — means you never chew the same stalk twice. 🥦
