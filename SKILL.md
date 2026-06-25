@@ -37,6 +37,10 @@ Pick any combination — `quick × changed` is a pre-commit reflex; `deep × rep
 is a pre-release gate. **State the level + scope you chose, and say what you
 skipped** — silent truncation reads as "covered everything."
 
+> **Forks & monorepos:** when most of the tree is upstream/vendored, `repo`
+> scope drowns in code you don't own. Default to `changed` or your owned
+> packages — here the scope dial is load-bearing, not optional.
+
 ---
 
 ## Phase 1 — Deterministic tooling
@@ -134,6 +138,10 @@ it next sweep — `[empirica]` `decision-log`; otherwise an inline annotation or
 | **Trust-the-input** — consuming upstream data unvalidated | validated at the boundary | it assumes well-formed and NoneTypes three calls later |
 | **Two-sources-of-truth drift** — a copy of a load-bearing thing | one is generated from the other | both are hand-maintained and have diverged |
 | **Semantic drift** — one word, different meanings across components | one canonical definition, referenced | each component quietly means its own thing (`id`, `session`, `scope`, "done") |
+| **Decision downgraded across a boundary** — a deny/soft decision crossing into a consumer with a *narrower* vocabulary | it degrades to the **floor** (deny / fail-closed) | it silently downgrades to *allow* — the three below |
+| ↳ *exit-code / status mismatch* — a host maps a subprocess code to a decision, defaulting on any unrecognized value | the default is the safe one (fail-closed) | unsafe default — a *crashed* gate fails open (e.g. "anything ≠ 2 ⇒ allow") |
+| ↳ *reason-less deny dropped* — a consumer drops a deny when a required field (reason/message) is empty | *(never by design)* | an empty-reason deny silently becomes allow |
+| ↳ *advisory unsupported downstream* — an upstream soft decision (ask/warn) the consumer can't express | it degrades to the floor (deny) | it silently downgrades to allow (no middle ⇒ must fail safe) |
 
 ### D. Environment & control flow
 | Smell | ✅ by design if | ❌ broken if |
