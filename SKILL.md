@@ -1,7 +1,7 @@
 ---
 name: eat-the-broccoli
 description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo or stack. Levels: quick / standard / deep. Scope: changed / module / repo."
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Eat the Broccoli 🥦
@@ -143,7 +143,29 @@ it logged a warning and returned `[]` as a *documented* degraded mode →
 | ↳ *reason-less deny dropped* — a consumer drops a deny when a required field (reason/message) is empty | *(never by design)* | an empty-reason deny silently becomes allow |
 | ↳ *advisory unsupported downstream* — an upstream soft decision (ask/warn) the consumer can't express | it degrades to the floor (deny) | it silently downgrades to allow (no middle ⇒ must fail safe) |
 
-### D. Environment & control flow
+### D. Indistinguishable incompleteness
+
+**An incomplete result that is indistinguishable from a complete one.** Not wrong
+answers — incomplete ones that *look* complete. Every instance passes its own
+checks; the caller reads a partial truth as the whole one and builds on it. The
+class only becomes visible when someone re-derives the total through a different
+surface — so hunt it deliberately:
+
+| Smell | ✅ by design if | ❌ broken if |
+|---|---|---|
+| **Silent truncation** — a bounded read (limit / page size / cap) over a collection | the response carries the *source-side* total (`total`, `points_count`) next to the page, and the caller checks it or pages to exhaustion | the default cap truncates seamlessly — a 201-chunk source at `max=200` joins into a string indistinguishable from complete; a `limit=500` scroll against 3 847 points reads as "not found" |
+| **Completeness signal computed from the wrong side** — `has_more` / `is_last` derived after filtering | derived from *source cursor exhaustion* | derived from the filtered page length — heavy filtering drives it false while whole pages go unread |
+| **Abbreviated identity on a consumer surface** — an id/hash truncated for display where something downstream keys on it | the abbreviation is display-only, clearly non-canonical, full value adjacent | a consumer parses the rendered form as the identity — exact-match joins silently return 0-of-N. *Never abbreviate an identity value where a consumer reads it* |
+| **Absence asserted from a defaulting read** — `.get(k, default)` / optional accessors make *missing key* and *null value* identical | absence claims are made with an explicit key-presence check (`k in row`), after enumerating every candidate field in the schema you already printed | a `.get()` default becomes "present but null"; a capability is declared absent while the sibling field that provides it sits in the same output |
+| **Green suite pins the defect** — a test asserts the exact (buggy) surface form | tests assert the *contract property* (completeness checkable, identity full-length) | the suite encodes the wrong assumption — the defect stays green until an end-to-end known-answer check catches it. *When a defect survives a green suite, the suite is a suspect, not an alibi* |
+| **Enablement is a catch-up, not a start** — flipping on a scanner/rail with pre-existing scheduled state | enabling re-arms stale `next_run_at` (or drains explicitly, in dependency order) | every overdue row fires at once in table order — cadences execute in *reverse* of how their cron strings read |
+
+**The counter-move for the whole class:** verify through the surface the
+*consumer* actually reads (not the producer's internals, not your test's
+mock), and design responses so completeness is checkable *from the response
+itself*. A partial read must be self-evidently partial.
+
+### E. Environment & control flow
 | Smell | ✅ by design if | ❌ broken if |
 |---|---|---|
 | **Deploy-staleness** — installed/copied artifact vs source | hash/mtime match, or a single source of truth | the box runs old code while source is "fixed" (the #1 recurring root cause) |
