@@ -6,7 +6,10 @@ A tiered, language-agnostic quality-and-pattern audit for any codebase. It pairs
 the deterministic tooling you already have (lint, types, tests, dependency CVEs,
 dead-code, silent-failure scanners) with a **learned-pattern hunt** — a
 checklist of the *hard* failure classes that pass every test and still ship
-broken: races, stale caches, silent fallbacks, null-masking, deploy-staleness.
+broken: races, stale caches, silent fallbacks, null-masking, deploy-staleness —
+and the family that catches the most in practice, **incompleteness you cannot
+distinguish from completeness**: a query whose filter makes a positive result
+impossible, read as evidence of absence.
 
 It's a [Claude Code](https://claude.com/claude-code) skill, but the checklist is
 useful to anyone.
@@ -22,10 +25,10 @@ useful to anyone.
 
 - **Two dials:** depth (`quick` / `standard` / `deep`) × scope (`changed` / `module` / `repo`).
 - **Deterministic tooling**, tool-agnostic — wire in your stack's linter / typechecker / scanner (Python & Rust reference stacks included). The pattern hunt needs no tooling at all.
-- **The pattern hunt** — ~20 structural failure classes across 4 families
-  (state & timing · failure visibility · boundaries & contracts · environment &
-  control flow), each with a *"is this by design?"* disambiguator so you catch
-  real issues without crying wolf on intentional ones.
+- **The pattern hunt** — 45 structural failure classes across 5 families
+  (state & timing · failure visibility · boundaries & contracts · indistinguishable
+  incompleteness · environment & control flow), each with a *"is this by design?"*
+  disambiguator so you catch real issues without crying wolf on intentional ones.
 - **A `.broccoli-accept` file** — record confirmed by-design findings so the next sweep skips them.
 
 ## Install
