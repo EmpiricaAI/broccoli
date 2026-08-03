@@ -54,6 +54,17 @@ works.
 | Dead code | vulture, ts-prune, cargo-machete |
 | Silent failures | bare `except:` / empty `catch {}` / discarded `Result` |
 | Contract guards | your CLI / API contract tests |
+| **Test freshness** | mutation testing (mutmut, Stryker, cargo-mutants); or grep for assertion-free tests, tautological asserts, and hand-built fixtures whose schema has drifted from the real one |
+
+**On that last row — coverage does not cover it.** Coverage asks *"was this line
+executed?"*; test freshness asks *"could this test have failed?"* Those come apart
+badly in fast iterative work, because tests written against yesterday's contract
+keep passing against today's code and **actively guard the drift**: a green
+assertion that the API returns 422 is indistinguishable from a green assertion that
+it should. Fixtures are the sharpest edge — a hand-built schema that has fallen
+behind the real one makes fixture and code agree with each other and disagree with
+production, so the suite is green precisely where it is blind. *If a defect
+survives a green suite, the suite is a suspect, not an alibi.*
 
 ### Tooling by language
 
@@ -127,6 +138,10 @@ it logged a warning and returned `[]` as a *documented* degraded mode →
 | **Fallback masks primary failure** — a degraded path | it logs/flags that it engaged | "it works" actually means "fallback works, primary silently dead" |
 | **Partial success as success** — a multi-step op, one rollup status | rollup is AND-of-all + per-item surfaced | a mid-step failure is swallowed by the final OK |
 | **Unfalsifiable success** — no distinct signal for worked-vs-failed | success and failure produce *different* legible output | both look the same (empty output, silence). *Ask: if this failed, could I tell?* |
+| **Unsatisfiable predicate** — a check whose condition cannot be met on any input the producer actually emits | the check has been observed firing *and* not firing on real data | it matched a shape nobody produces, so it fires on everything (or nothing) forever, and its opposite branch is unreachable code. A "narrow breadth" nudge tested `isinstance(v, (int,float))` against a dict-of-dicts: it warned on every transaction including ones that did the right thing, and its positive branch had never executed once. *A check that cannot pass is training, not feedback — and what it trains is dismissal of every signal printed beside it* |
+| **Wrong-domain scan** — an analyzer pointed at a subject it wasn't written for | the tool declares its scope and refuses (or reports NOT APPLICABLE, **counted separately from passes**) when the subject doesn't match | it runs happily and emits specific, plausible, entirely false findings — checks resolving *their own* project's symbols against *another* repo reported 13 dead enum values that don't exist there. *Zero-files-scanned is loud; wrong-tree-scanned is silent, and the silent one is strictly worse* |
+| **Verb that always fails** — an operation that errors on every single call | the failure is surfaced where someone acts on it | it fails *loudly* every time and therefore leaves **no trace in the data it was meant to change** — callers quietly fall back to another path, and no audit of the output can find it because nothing was ever written. A batch-resolve targeting a table that never existed was dead for its whole life across two independent installs. *Ask "has this verb ever successfully written anything?" — a zero-success verb and an unused verb are identical in the code and opposite in meaning* |
+| **Negative assertion without a positive control** — a test/check that proves something is *absent* | the same call is shown to return *something* — assert a positive result first, then the absence within it | the channel was dead and absence proved nothing. A filtered-out record "verified absent" by grepping output that was actually a usage error. *An absence observed through an instrument not shown to be live is not evidence* |
 
 ### C. Boundaries & contracts
 | Smell | ✅ by design if | ❌ broken if |
@@ -137,6 +152,8 @@ it logged a warning and returned `[]` as a *documented* degraded mode →
 | **One predicate, two questions** — a check written for one question reused for a second that *looks* identical | both questions genuinely have the same answer for every state, including the edge ones | they diverge on a state neither caller thought about — "what may I delete?" and "what exists?" agree everywhere except on things that are **archived**, so an existence test borrowed from a deletion allow-list judged every archived referent missing and a routine prune destroyed live links |
 | **Trust-the-input** — consuming upstream data unvalidated | validated at the boundary | it assumes well-formed and NoneTypes three calls later |
 | **Two-sources-of-truth drift** — a copy of a load-bearing thing | one is generated from the other | both are hand-maintained and have diverged |
+| **Invisible dependency** — coupling that doesn't appear in the import list | dependencies are declared where a reviewer looks for them (imports, manifest, injected params) | the coupling is through *symbols the logic resolves at runtime*, so a portability review by import-list clears it. Three checks were audited for portability by reading imports; only one declared its dependency there, and the other two shipped and produced false findings against a foreign repo. *Reviewing coupling by reading imports finds only the coupling that chose to be visible* |
+| **Else-branch mis-route at N+1** — `if A … else B` standing in for an enumerable set | the else is a genuine catch-all whose behaviour is right for anything not-A | it's a correct default for the *two* types that existed and silently mis-files the third. Adding a type to a dispatch map would have written invalidated dead-ends into the *unknowns* store — correct in SQLite, wrong in the canonical log, surfacing only on a rebuild months later. *An `else` covering an enumerable set is a bug scheduled for whenever the set grows* |
 | **Projection omits what storage holds** — an object/DTO/serializer mirroring a record | the field is deliberately withheld (secret, internal counter) and that's declared somewhere | the column exists, internal queries read it, and consumers reading it off the object get `AttributeError`/`undefined`. *Tell: every test asserts on the behaviour the field ENABLES, none reads it back off the object* |
 | **Semantic drift** — one word, different meanings across components | one canonical definition, referenced | each component quietly means its own thing (`id`, `session`, `scope`, "done") |
 | **Decision downgraded across a boundary** — a deny/soft decision crossing into a consumer with a *narrower* vocabulary | it degrades to the **floor** (deny / fail-closed) | it silently downgrades to *allow* — the three below |
@@ -176,6 +193,7 @@ itself*. A partial read must be self-evidently partial.
 | **Gate gates its own escape** — a guard blocking its own clear-path | the recovery action is always-open *before* the gate | the verb that would clear the deny is itself denied |
 | **Unrecoverable gate** — a deny with a "do X first" message | doing X actually satisfies it | the satisfaction window closed before X can run |
 | **Dead branch by construction** — a path an earlier check already decided | intentional belt-and-suspenders | genuinely unreachable (shadowed by a prior return) |
+| **Cause outside the call graph** — a failure whose root cause is a shared resource (disk, inodes, fds, ports, memory) exhausted by something the failing code never touches | the exhaustion surfaces AS ITSELF — a legible `ENOSPC`/`EMFILE` naming the resource, so the reader looks outside | the runtime translates it into an ordinary-looking failure in innocent code. Test fixtures leaking `mkdtemp()` dirs filled a shared 24G `/tmp`; the symptom was 5 failures + 3 errors in a suite nobody had touched, and an hour went into debugging that suite. Clearing `/tmp` alone turned it green with zero code change. *Every other row here describes a defect reachable from the failing code. This one is not in the call graph at all, so the signal points at the wrong file **by construction** — no amount of reading the named code can find it.* **Check `df` / `ulimit -n` / the port table BEFORE the code whenever failures appear somewhere your change did not reach** |
 
 > **This table is living.** When a new class of issue bites you, add a row with
 > its disambiguator — every incident becomes a permanent future check. Found one
