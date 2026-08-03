@@ -1,7 +1,7 @@
 ---
 name: eat-the-broccoli
 description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo or stack. Levels: quick / standard / deep. Scope: changed / module / repo."
-version: 2.3.0
+version: 2.4.0
 ---
 
 # Eat the Broccoli 🥦
@@ -68,34 +68,10 @@ survives a green suite, the suite is a suspect, not an alibi.*
 
 ### Tooling by language
 
-The dimensions map to concrete tools. Two reference stacks:
-
-**Python**
-| Dimension | Tool | Install / run |
-|---|---|---|
-| Lint + silent-failure | ruff | `pip install ruff` → `ruff check` (silent: `--select S110,S112,BLE001`) |
-| Types | pyright | `pip install pyright` → `pyright` |
-| Tests | pytest | `pip install pytest` → `pytest -q` |
-| Dep CVEs | pip-audit | `pip install pip-audit` → `pip-audit` |
-| Dead code | vulture | `pip install vulture` → `vulture src/ --min-confidence 80` |
-| Complexity | radon | `pip install radon` → `radon cc src/ --min C` |
-| SAST | semgrep | `pip install semgrep` → `semgrep --config auto` |
-| Secrets | trufflehog | `trufflehog git file://.` |
-
-**Rust**
-| Dimension | Tool | Install / run |
-|---|---|---|
-| Lint | clippy | `rustup component add clippy` → `cargo clippy -- -D warnings` |
-| Format | rustfmt | `cargo fmt --check` |
-| Types / build | rustc | `cargo check` |
-| Tests | cargo&nbsp;test / nextest | `cargo test` (or `cargo install cargo-nextest` → `cargo nextest run`) |
-| Dep CVEs + licenses | cargo-audit, cargo-deny | `cargo install cargo-audit cargo-deny` → `cargo audit`, `cargo deny check` |
-| Unused deps / dead code | cargo-machete, rustc `dead_code` | `cargo install cargo-machete` → `cargo machete` (`dead_code` lint is on by default) |
-| Silent failures | clippy | `-W clippy::unwrap_used -W clippy::let_underscore_must_use` + hunt discarded Results: `let _ = fallible()`, `.ok()`, `.unwrap_or_default()` |
-| Unsafe audit | cargo-geiger | `cargo install cargo-geiger` → `cargo geiger` |
-
-> The **pattern hunt below is language-agnostic** — it ports verbatim across any
-> stack.
+Concrete per-stack tool choices (Python, Rust) live in
+[references/stacks.md](references/stacks.md) — consult it when wiring a stack, not
+while hunting. **The pattern hunt below is language-agnostic** and ports verbatim
+across any stack.
 
 **Reading silent failures:** a truly-silent swallow (`except: pass`, empty
 `catch {}`, `let _ = fallible()`) is the dangerous one. A broad catch that *logs
@@ -209,6 +185,31 @@ itself*. A partial read must be self-evidently partial.
 3. **Rank by blast radius, then cut.** Sort findings by the damage the failure would do, not by how many you found — a sweep with 8 prioritized findings gets acted on; one with 30 gets skimmed and ignored. Calibrate severity to the *stated* context: a missing backup is a 🟢 note for a scratch script and a 🔴 blocker for a billing path. Never grade an MVP against an enterprise checklist — that's noise wearing a badge.
 4. **Roll up a verdict:** 🟢 **GREEN** (ship) · 🟡 **YELLOW** (ship + logged follow-ups) · 🔴 **RED** (blockers — name them).
 5. Re-runs are idempotent: track counts over time. A *rising* silent-failure / debt count is the signal, not the absolute number.
+
+### Output contract
+
+Every sweep ends with these four blocks, in this order. A finding nobody can act
+on is the same as no finding.
+
+```
+VERDICT   🟢 GREEN | 🟡 YELLOW | 🔴 RED        — one line, blockers named if RED
+
+FINDINGS  ranked by blast radius, not by discovery order
+          <pattern-name> · <file:line> · <why it is broken, not just what it is>
+          severity calibrated to the STATED context, not to an absolute bar
+
+COUNTS    silent-failures · accepted (.broccoli-accept) · new-since-last-run
+          the trend is the signal; the absolute number is not
+
+NOT COVERED   what this sweep could not check, and why
+```
+
+**That last block is not optional, and it is the one people drop.** A sweep that
+reports only what it found is indistinguishable from a sweep that found
+everything — precisely the failure family in §D, aimed at this skill's own output.
+Tooling you don't have, paths you skipped, a scope of `changed` when the risk is
+repo-wide, a language the linter doesn't parse: name it. *An audit silent about
+its own blind spots converts "unknown" into "clean" in the reader's head.*
 
 ### The `.broccoli-accept` file
 

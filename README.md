@@ -33,11 +33,17 @@ useful to anyone.
 
 ## Install
 
-Drop `SKILL.md` into your Claude Code skills directory:
+Copy `SKILL.md` **and the `references/` directory beside it** into your Claude
+Code skills directory:
 
 ```
-~/.claude/plugins/local/<your-plugin>/skills/eat-the-broccoli/SKILL.md
+~/.claude/plugins/local/<your-plugin>/skills/eat-the-broccoli/
+├── SKILL.md
+└── references/stacks.md
 ```
+
+`SKILL.md` alone still runs — `references/` is loaded on demand, only when you're
+wiring a stack's tooling for the first time.
 
 Then say `/eat-the-broccoli` (or "eat the broccoli").
 
