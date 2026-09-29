@@ -25,7 +25,7 @@ useful to anyone.
 
 - **Two dials:** depth (`quick` / `standard` / `deep`) × scope (`changed` / `module` / `repo`).
 - **Deterministic tooling**, tool-agnostic — wire in your stack's linter / typechecker / scanner (Python & Rust reference stacks included). The pattern hunt needs no tooling at all.
-- **The pattern hunt** — 45 structural failure classes across 5 families
+- **The pattern hunt** — 48 structural failure classes across 5 families
   (state & timing · failure visibility · boundaries & contracts · indistinguishable
   incompleteness · environment & control flow), each with a *"is this by design?"*
   disambiguator so you catch real issues without crying wolf on intentional ones.
