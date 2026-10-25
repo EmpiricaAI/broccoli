@@ -1,7 +1,7 @@
 ---
 name: eat-the-broccoli
 description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo or stack. Levels: quick / standard / deep. Scope: changed / module / repo."
-version: 2.10.0
+version: 2.11.0
 ---
 
 # Eat the Broccoli 🥦
@@ -182,6 +182,7 @@ itself*. A partial read must be self-evidently partial.
 | **Unrecoverable gate** — a deny with a "do X first" message | doing X actually satisfies it | the satisfaction window closed before X can run |
 | **Dead branch by construction** — a path an earlier check already decided | intentional belt-and-suspenders | genuinely unreachable (shadowed by a prior return) |
 | **Cause outside the call graph** — a failure whose root cause is a shared resource (disk, inodes, fds, ports, memory) exhausted by something the failing code never touches | the exhaustion surfaces AS ITSELF — a legible `ENOSPC`/`EMFILE` naming the resource, so the reader looks outside | the runtime translates it into an ordinary-looking failure in innocent code. Test fixtures leaking `mkdtemp()` dirs filled a shared 24G `/tmp`; the symptom was 5 failures + 3 errors in a suite nobody had touched, and an hour went into debugging that suite. Clearing `/tmp` alone turned it green with zero code change. *Every other row here describes a defect reachable from the failing code. This one is not in the call graph at all, so the signal points at the wrong file **by construction** — no amount of reading the named code can find it.* **Check `df` / `ulimit -n` / the port table BEFORE the code whenever failures appear somewhere your change did not reach** |
+| **Declared support wider than anything exercises** — a support matrix (`requires-python`, supported OSes, runtime engines, dependency floors) | every declared version has a job that would fail if it broke, or the gap is written down as unverified | the claim says `>=3.10` while CI runs 3.11 and 3.13 and developers run 3.14, so nothing ever executes the floor. A syntax only 3.12 accepts passed lint and format (ruff targets py310 but parses with the newest grammar) and the whole suite, then broke the one older version CI did run, after the push. *Ask: which job fails if the oldest version we claim breaks? `uv run --python <floor> --no-project python -c` over `ast.parse` of the tree closes the syntax half in seconds.* |
 
 > **This table is living.** When a new class of issue bites you, add a row with
 > its disambiguator — every incident becomes a permanent future check. Found one
