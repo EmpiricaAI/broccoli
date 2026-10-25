@@ -1,7 +1,7 @@
 ---
 name: eat-the-broccoli
 description: "Use when the user says '/eat-the-broccoli', 'eat the broccoli', 'full quality sweep', 'pre-release audit', 'run the deep tests', or asks to hunt for gaps / membrane misses / stubs / dead code / silent failures / the bugs that pass tests but are still broken. A tiered quality-and-pattern audit: deterministic tooling (lint, types, tests, deps, dead-code, silent-failure) PLUS a learned-pattern hunt for the hard, judgment-requiring failure classes that tools can't catch. Works in any repo or stack. Levels: quick / standard / deep. Scope: changed / module / repo."
-version: 2.9.0
+version: 2.10.0
 ---
 
 # Eat the Broccoli 🥦
@@ -141,6 +141,7 @@ it logged a warning and returned `[]` as a *documented* degraded mode →
 | ↳ *exit-code / status mismatch* — a host maps a subprocess code to a decision, defaulting on any unrecognized value | the default is the safe one (fail-closed) | unsafe default — a *crashed* gate fails open (e.g. "anything ≠ 2 ⇒ allow") |
 | ↳ *reason-less deny dropped* — a consumer drops a deny when a required field (reason/message) is empty | *(never by design)* | an empty-reason deny silently becomes allow |
 | ↳ *advisory unsupported downstream* — an upstream soft decision (ask/warn) the consumer can't express | it degrades to the floor (deny) | it silently downgrades to allow (no middle ⇒ must fail safe) |
+| **Delimiter-bounded rewrite** — a generator that replaces "everything from marker X to the next delimiter I know of" | the span is bounded by structure (the next heading of the same or higher level, outside code fences) and everything outside it is returned byte for byte | it ends at a delimiter the author happened to anticipate, so an input shape nobody wrote a case for loses what follows or leaves a stale copy beside the new one, and the tool prints success. A README sync ran to the next `## ` or `---`: a `# ` heading, a fenced `## `, a `---` between two sections, and a curly apostrophe each ate or duplicated content. *Test with a sentinel line after the span in every shape you can invent; if the sentinel can vanish, the span is wrong. Make a second section that should be replaced a refusal when it is outside the span, not a duplicate.* |
 
 ### D. Indistinguishable incompleteness
 
